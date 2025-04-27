@@ -11,10 +11,10 @@ uint64
 sys_exit(void)
 {
   int n;
-  if(argint(0, &n) < 0)
+  if (argint(0, &n) < 0)
     return -1;
   exit(n);
-  return 0;  // not reached
+  return 0; // not reached
 }
 
 uint64
@@ -33,7 +33,7 @@ uint64
 sys_wait(void)
 {
   uint64 p;
-  if(argaddr(0, &p) < 0)
+  if (argaddr(0, &p) < 0)
     return -1;
   return wait(p);
 }
@@ -44,10 +44,10 @@ sys_sbrk(void)
   int addr;
   int n;
 
-  if(argint(0, &n) < 0)
+  if (argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  if (growproc(n) < 0)
     return -1;
   return addr;
 }
@@ -58,12 +58,16 @@ sys_sleep(void)
   int n;
   uint ticks0;
 
-  if(argint(0, &n) < 0)
+  kama_backtrace();
+
+  if (argint(0, &n) < 0)
     return -1;
   acquire(&tickslock);
   ticks0 = ticks;
-  while(ticks - ticks0 < n){
-    if(myproc()->killed){
+  while (ticks - ticks0 < n)
+  {
+    if (myproc()->killed)
+    {
       release(&tickslock);
       return -1;
     }
@@ -78,7 +82,7 @@ sys_kill(void)
 {
   int pid;
 
-  if(argint(0, &pid) < 0)
+  if (argint(0, &pid) < 0)
     return -1;
   return kill(pid);
 }
@@ -94,4 +98,43 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// 设置进程过程中时钟的相关属性
+int kama_sigalarm(int ticks, void (*handler)())
+{
+  // 获取当前进程
+  struct proc *p = myproc();
+  p->kama_alarm_handler = handler;
+  p->kama_alarm_interval = ticks;
+  p->kama_alarm_ticks = ticks;
+  return 0;
+}
+
+uint64
+sys_sigalarm(void)
+{
+  int n;     // n个ticks
+  uint64 fn; // 中断处理函数的地址
+  // 获取第一个参数
+  if (argint(0, &n) < 0 || argaddr(1, &fn) < 0)
+  {
+    return -1;
+  }
+  return kama_sigalarm(n, (void (*)())fn);
+}
+
+int kama_sigreturn(void)
+{
+  // 将进程的信息恢复至alarm中断之前
+  struct proc *p = myproc();
+  *p->trapframe = *p->kama_alarm_trapframe;
+  p->kama_alarm_goingoff = 0;
+  return 0;
+}
+
+uint64
+sys_sigreturn(void)
+{
+  return kama_sigreturn();
 }
